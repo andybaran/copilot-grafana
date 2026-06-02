@@ -1,0 +1,5 @@
+# Rendered from templates by `make install`
+scripts/startup.sh
+launchd.out.log
+launchd.err.log
+*.log

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Start the Copilot observability stack. Ensures the podman machine is running first.
+# Invoked by the launchd agent at login, and usable manually.
+set -euo pipefail
+
+REPO_DIR="__REPO_DIR__"
+COMPOSE="__COMPOSE__"
+
+cd "$REPO_DIR"
+
+# Ensure the podman VM is up (no-op on Docker Desktop setups).
+if command -v podman >/dev/null 2>&1; then
+  if ! podman machine inspect --format '{{.State}}' 2>/dev/null | grep -q running; then
+    podman machine start || true
+  fi
+fi
+
+# Wait for the container engine to be ready.
+for _ in $(seq 1 30); do
+  if podman info >/dev/null 2>&1 || docker info >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+exec $COMPOSE up -d

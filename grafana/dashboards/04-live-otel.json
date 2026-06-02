@@ -1,0 +1,53 @@
+{
+  "uid": "copilot-live-otel",
+  "title": "Copilot — Live OTel (operational)",
+  "tags": ["copilot", "otel", "live"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 99, "type": "text", "title": "About",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": { "mode": "markdown", "content": "Real-time OTel metrics from the Copilot CLI (collector \u2192 Prometheus). **Operational view only** \u2014 for historical/per-session accounting use the Postgres-backed dashboards. These series reflect activity while the collector is running." }
+    },
+    {
+      "id": 1, "type": "timeseries", "title": "Token Usage Rate by Type",
+      "datasource": { "type": "prometheus", "uid": "copilot-prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 3 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [ { "refId": "A",
+        "expr": "sum by (gen_ai_token_type) (rate(gen_ai_client_token_usage_sum[5m]))",
+        "legendFormat": "{{gen_ai_token_type}}" } ]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Token Usage Rate by Model",
+      "datasource": { "type": "prometheus", "uid": "copilot-prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 3 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [ { "refId": "A",
+        "expr": "sum by (gen_ai_request_model) (rate(gen_ai_client_token_usage_sum[5m]))",
+        "legendFormat": "{{gen_ai_request_model}}" } ]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Operation Duration (avg, by operation)",
+      "datasource": { "type": "prometheus", "uid": "copilot-prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [ { "refId": "A",
+        "expr": "sum by (gen_ai_operation_name) (rate(gen_ai_client_operation_duration_seconds_sum[5m])) / sum by (gen_ai_operation_name) (rate(gen_ai_client_operation_duration_seconds_count[5m]))",
+        "legendFormat": "{{gen_ai_operation_name}}" } ]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Tool Call Rate",
+      "datasource": { "type": "prometheus", "uid": "copilot-prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [ { "refId": "A",
+        "expr": "sum by (tool_name) (rate(github_copilot_tool_call_count_total[5m]))",
+        "legendFormat": "{{tool_name}}" } ]
+    }
+  ]
+}

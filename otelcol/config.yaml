@@ -1,0 +1,44 @@
+# OpenTelemetry Collector (contrib) config for Copilot CLI telemetry.
+# Receives OTLP from the CLI on the host, exposes metrics for Prometheus to scrape,
+# and (optionally) forwards traces to Tempo.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+
+exporters:
+  # Exposes a /metrics endpoint that Prometheus scrapes (see prometheus.yml).
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+    enable_open_metrics: true
+  # Forward traces to Tempo (only used when the `traces` compose profile is active).
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  debug:
+    verbosity: normal
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo, debug]

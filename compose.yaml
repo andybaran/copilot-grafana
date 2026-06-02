@@ -1,0 +1,101 @@
+# Copilot CLI Token Observability stack.
+# Default `up` starts: postgres, otel-collector, prometheus, grafana.
+# Add `--profile traces` to also start Tempo for live per-session trace drill-down.
+name: copilot-observability
+
+services:
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: copilot
+      POSTGRES_PASSWORD: copilot
+      POSTGRES_DB: copilot_usage
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copilot -d copilot_usage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  otel-collector:
+    image: docker.io/otel/opentelemetry-collector-contrib:0.111.0
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otelcol/config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+      - "127.0.0.1:8889:8889"   # Prometheus scrape endpoint (collector exporter)
+
+  prometheus:
+    image: docker.io/prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=365d"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - otel-collector
+
+  tempo:
+    image: docker.io/grafana/tempo:2.6.1
+    restart: unless-stopped
+    profiles: ["traces"]
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    ports:
+      - "127.0.0.1:3200:3200"   # Tempo query API
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+
+  # One-shot parser: events.jsonl -> Postgres. Run via `make backfill`.
+  backfill:
+    build: ./backfill
+    profiles: ["tools"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: copilot
+      PGPASSWORD: copilot
+      PGDATABASE: copilot_usage
+      SESSION_STATE_DIR: /data/session-state
+    volumes:
+      - ${COPILOT_HOME:-${HOME}/.copilot}/session-state:/data/session-state:ro
+    depends_on:
+      - postgres
+
+  grafana:
+    image: docker.io/grafana/grafana:11.4.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_USERS_DEFAULT_THEME: dark
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - postgres
+      - prometheus
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  tempo-data:
+  grafana-data:
