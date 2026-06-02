@@ -1,52 +1,185 @@
 {
   "uid": "copilot-skills-models",
-  "title": "Copilot — Skills & Models",
-  "tags": ["copilot", "skills", "models"],
+  "title": "Copilot \u2014 Skills & Models",
+  "tags": [
+    "copilot",
+    "skills",
+    "models"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
-  "time": { "from": "now-90d", "to": "now" },
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
   "refresh": "5m",
   "panels": [
     {
-      "id": 1, "type": "barchart", "title": "Top Skills by Sessions Used",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 0 },
-      "fieldConfig": { "defaults": { "unit": "short" } },
-      "options": { "orientation": "horizontal", "xField": "Skill" },
-      "targets": [ { "refId": "A", "format": "table", "rawQuery": true,
-        "rawSql": "SELECT k.skill AS \"Skill\", COUNT(DISTINCT k.session_id) AS \"Sessions\" FROM session_skills k JOIN sessions s ON s.session_id=k.session_id WHERE $__timeFilter(s.start_time) GROUP BY 1 ORDER BY 2 DESC LIMIT 25" } ]
+      "id": 1,
+      "type": "barchart",
+      "title": "Top Skills by Sessions Used",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Skill"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT k.skill AS \"Skill\", COUNT(DISTINCT k.session_id) AS \"Sessions\" FROM session_skills k JOIN sessions s ON s.session_id=k.session_id WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 2 DESC LIMIT 25"
+        }
+      ]
     },
     {
-      "id": 2, "type": "barchart", "title": "Tokens by Model",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 0 },
-      "fieldConfig": { "defaults": { "unit": "short" } },
-      "options": { "orientation": "horizontal", "xField": "Model" },
-      "targets": [ { "refId": "A", "format": "table", "rawQuery": true,
-        "rawSql": "SELECT m.model AS \"Model\", SUM(m.input_tokens+m.output_tokens+m.cache_read_tokens+m.cache_write_tokens+m.reasoning_tokens) AS \"Tokens\" FROM session_models m JOIN sessions s ON s.session_id=m.session_id WHERE s.complete AND $__timeFilter(s.start_time) GROUP BY 1 ORDER BY 2 DESC" } ]
+      "id": 2,
+      "type": "barchart",
+      "title": "Tokens by Model",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Model"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT m.model AS \"Model\", SUM(m.input_tokens+m.output_tokens+m.cache_read_tokens+m.cache_write_tokens+m.reasoning_tokens) AS \"Tokens\" FROM session_models m JOIN sessions s ON s.session_id=m.session_id WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 2 DESC"
+        }
+      ]
     },
     {
-      "id": 3, "type": "timeseries", "title": "Skill Usage per Day (sessions)",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 10 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "stacking": { "mode": "normal" }, "fillOpacity": 70 } } },
-      "targets": [ { "refId": "A", "format": "time_series", "rawQuery": true,
-        "rawSql": "SELECT date_trunc('day', s.start_time) AS time, k.skill AS metric, COUNT(DISTINCT k.session_id) AS value FROM session_skills k JOIN sessions s ON s.session_id=k.session_id WHERE $__timeFilter(s.start_time) GROUP BY 1,2 ORDER BY 1" } ]
+      "id": 3,
+      "type": "timeseries",
+      "title": "Skill Usage per Day (sessions)",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 70
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('day', s.start_time) AS time, k.skill AS metric, COUNT(DISTINCT k.session_id) AS value FROM session_skills k JOIN sessions s ON s.session_id=k.session_id WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1,2 ORDER BY 1"
+        }
+      ]
     },
     {
-      "id": 4, "type": "table", "title": "Model Detail",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 19 },
-      "targets": [ { "refId": "A", "format": "table", "rawQuery": true,
-        "rawSql": "SELECT m.model AS \"Model\", COUNT(DISTINCT m.session_id) AS \"Sessions\", SUM(m.requests) AS \"Requests\", SUM(m.input_tokens) AS \"Input\", SUM(m.output_tokens) AS \"Output\", SUM(m.cache_read_tokens) AS \"Cache Read\", SUM(m.reasoning_tokens) AS \"Reasoning\", SUM(m.cost) AS \"Premium Cost\" FROM session_models m JOIN sessions s ON s.session_id=m.session_id WHERE s.complete AND $__timeFilter(s.start_time) GROUP BY 1 ORDER BY 4 DESC" } ]
+      "id": 4,
+      "type": "table",
+      "title": "Model Detail",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT m.model AS \"Model\", COUNT(DISTINCT m.session_id) AS \"Sessions\", SUM(m.requests) AS \"Requests\", SUM(m.input_tokens) AS \"Input\", SUM(m.output_tokens) AS \"Output\", SUM(m.cache_read_tokens) AS \"Cache Read\", SUM(m.reasoning_tokens) AS \"Reasoning\", SUM(m.cost) AS \"Premium Cost\" FROM session_models m JOIN sessions s ON s.session_id=m.session_id WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 4 DESC"
+        }
+      ]
     },
     {
-      "id": 5, "type": "table", "title": "Skill Detail",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 19 },
-      "targets": [ { "refId": "A", "format": "table", "rawQuery": true,
-        "rawSql": "SELECT k.skill AS \"Skill\", COUNT(DISTINCT k.session_id) AS \"Sessions\", SUM(k.invocations) AS \"Invocations\" FROM session_skills k JOIN sessions s ON s.session_id=k.session_id WHERE $__timeFilter(s.start_time) GROUP BY 1 ORDER BY 2 DESC" } ]
+      "id": 5,
+      "type": "table",
+      "title": "Skill Detail",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT k.skill AS \"Skill\", COUNT(DISTINCT k.session_id) AS \"Sessions\", SUM(k.invocations) AS \"Invocations\" FROM session_skills k JOIN sessions s ON s.session_id=k.session_id WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 2 DESC"
+        }
+      ]
     }
-  ]
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "label": "Project",
+        "type": "query",
+        "datasource": {
+          "type": "postgres",
+          "uid": "copilot-postgres"
+        },
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "allValue": null,
+        "current": {},
+        "options": [],
+        "query": "SELECT DISTINCT project FROM sessions WHERE project IS NOT NULL ORDER BY 1",
+        "sort": 1
+      }
+    ]
+  }
 }

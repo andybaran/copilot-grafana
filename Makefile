@@ -4,7 +4,7 @@ COMPOSE ?= docker-compose
 PLIST   := com.user.copilot-observability.plist
 LA_DIR  := $(HOME)/Library/LaunchAgents
 
-.PHONY: help up down restart logs ps backfill traces install uninstall psql urls
+.PHONY: help up down restart logs ps backfill traces install uninstall psql urls migrate
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -30,6 +30,12 @@ ps: ## Show container status
 
 backfill: ## Parse ~/.copilot/session-state/*/events.jsonl into Postgres (idempotent)
 	$(COMPOSE) --profile tools run --rm backfill
+
+migrate: ## Apply postgres/migrations/*.sql to the running database (idempotent)
+	@for f in $$(ls postgres/migrations/*.sql | sort); do \
+		echo "applying $$f"; \
+		$(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U copilot -d copilot_usage < "$$f"; \
+	done
 
 psql: ## Open a psql shell to the usage database
 	$(COMPOSE) exec postgres psql -U copilot -d copilot_usage

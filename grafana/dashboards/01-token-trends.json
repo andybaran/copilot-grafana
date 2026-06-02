@@ -1,19 +1,45 @@
 {
   "uid": "copilot-token-trends",
-  "title": "Copilot — Token Trends",
-  "tags": ["copilot", "tokens"],
+  "title": "Copilot \u2014 Token Trends",
+  "tags": [
+    "copilot",
+    "tokens"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
-  "time": { "from": "now-90d", "to": "now" },
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
   "refresh": "5m",
   "templating": {
     "list": [
       {
+        "name": "project",
+        "label": "Project",
+        "type": "query",
+        "datasource": {
+          "type": "postgres",
+          "uid": "copilot-postgres"
+        },
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "allValue": null,
+        "current": {},
+        "options": [],
+        "query": "SELECT DISTINCT project FROM sessions WHERE project IS NOT NULL ORDER BY 1",
+        "sort": 1
+      },
+      {
         "name": "model",
         "label": "Model",
         "type": "query",
-        "datasource": { "type": "postgres", "uid": "copilot-postgres" },
+        "datasource": {
+          "type": "postgres",
+          "uid": "copilot-postgres"
+        },
         "includeAll": true,
         "multi": true,
         "refresh": 2,
@@ -23,66 +49,243 @@
   },
   "panels": [
     {
-      "id": 1, "type": "stat", "title": "Total Tokens (complete sessions)",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-      "fieldConfig": { "defaults": { "unit": "short" } },
-      "targets": [ { "refId": "A", "format": "table", "rawQuery": true,
-        "rawSql": "SELECT COALESCE(SUM(m.input_tokens+m.output_tokens+m.cache_read_tokens+m.cache_write_tokens+m.reasoning_tokens),0) AS total FROM sessions s JOIN session_models m ON m.session_id=s.session_id WHERE s.complete AND $__timeFilter(s.start_time)" } ]
+      "id": 1,
+      "type": "stat",
+      "title": "Total Tokens (complete sessions)",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(m.input_tokens+m.output_tokens+m.cache_read_tokens+m.cache_write_tokens+m.reasoning_tokens),0) AS total FROM sessions s JOIN session_models m ON m.session_id=s.session_id WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
     },
     {
-      "id": 2, "type": "stat", "title": "Sessions",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-      "targets": [ { "refId": "A", "format": "table", "rawQuery": true,
-        "rawSql": "SELECT COUNT(*) AS sessions FROM sessions s WHERE $__timeFilter(s.start_time)" } ]
+      "id": 2,
+      "type": "stat",
+      "title": "Sessions",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS sessions FROM sessions s WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
     },
     {
-      "id": 3, "type": "stat", "title": "Premium Requests",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-      "targets": [ { "refId": "A", "format": "table", "rawQuery": true,
-        "rawSql": "SELECT COALESCE(SUM(premium_requests),0) AS premium FROM sessions s WHERE $__timeFilter(s.start_time)" } ]
+      "id": 3,
+      "type": "stat",
+      "title": "Premium Requests",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(premium_requests),0) AS premium FROM sessions s WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
     },
     {
-      "id": 4, "type": "stat", "title": "Incomplete Sessions",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
-      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" } } },
-      "targets": [ { "refId": "A", "format": "table", "rawQuery": true,
-        "rawSql": "SELECT COUNT(*) AS incomplete FROM sessions s WHERE NOT s.complete AND $__timeFilter(s.start_time)" } ]
+      "id": 4,
+      "type": "stat",
+      "title": "Incomplete Sessions",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS incomplete FROM sessions s WHERE NOT s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
     },
     {
-      "id": 5, "type": "timeseries", "title": "Tokens per Day by Token Type",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 4 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "stacking": { "mode": "normal" }, "fillOpacity": 70 } } },
-      "targets": [ { "refId": "A", "format": "time_series", "rawQuery": true,
-        "rawSql": "SELECT date_trunc('day', s.start_time) AS time, SUM(m.input_tokens) AS \"input\", SUM(m.output_tokens) AS \"output\", SUM(m.cache_read_tokens) AS \"cache_read\", SUM(m.cache_write_tokens) AS \"cache_write\", SUM(m.reasoning_tokens) AS \"reasoning\" FROM sessions s JOIN session_models m ON m.session_id=s.session_id WHERE s.complete AND $__timeFilter(s.start_time) GROUP BY 1 ORDER BY 1" } ]
+      "id": 5,
+      "type": "timeseries",
+      "title": "Tokens per Day by Token Type",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 70
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('day', s.start_time) AS time, SUM(m.input_tokens) AS \"input\", SUM(m.output_tokens) AS \"output\", SUM(m.cache_read_tokens) AS \"cache_read\", SUM(m.cache_write_tokens) AS \"cache_write\", SUM(m.reasoning_tokens) AS \"reasoning\" FROM sessions s JOIN session_models m ON m.session_id=s.session_id WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 1"
+        }
+      ]
     },
     {
-      "id": 6, "type": "timeseries", "title": "Tokens per Day by Model",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 4 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "stacking": { "mode": "normal" }, "fillOpacity": 70 } } },
-      "targets": [ { "refId": "A", "format": "time_series", "rawQuery": true,
-        "rawSql": "SELECT date_trunc('day', s.start_time) AS time, m.model AS metric, SUM(m.input_tokens+m.output_tokens+m.cache_read_tokens+m.cache_write_tokens+m.reasoning_tokens) AS value FROM sessions s JOIN session_models m ON m.session_id=s.session_id WHERE s.complete AND $__timeFilter(s.start_time) GROUP BY 1,2 ORDER BY 1" } ]
+      "id": 6,
+      "type": "timeseries",
+      "title": "Tokens per Day by Model",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 70
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('day', s.start_time) AS time, m.model AS metric, SUM(m.input_tokens+m.output_tokens+m.cache_read_tokens+m.cache_write_tokens+m.reasoning_tokens) AS value FROM sessions s JOIN session_models m ON m.session_id=s.session_id WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1,2 ORDER BY 1"
+        }
+      ]
     },
     {
-      "id": 7, "type": "timeseries", "title": "Premium Requests per Day",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 70 } } },
-      "targets": [ { "refId": "A", "format": "time_series", "rawQuery": true,
-        "rawSql": "SELECT date_trunc('day', s.start_time) AS time, SUM(s.premium_requests) AS \"premium requests\" FROM sessions s WHERE $__timeFilter(s.start_time) GROUP BY 1 ORDER BY 1" } ]
+      "id": 7,
+      "type": "timeseries",
+      "title": "Premium Requests per Day",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('day', s.start_time) AS time, SUM(s.premium_requests) AS \"premium requests\" FROM sessions s WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 1"
+        }
+      ]
     },
     {
-      "id": 8, "type": "timeseries", "title": "Cache-Read vs Fresh Input Tokens per Day",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 20 } } },
-      "targets": [ { "refId": "A", "format": "time_series", "rawQuery": true,
-        "rawSql": "SELECT date_trunc('day', s.start_time) AS time, SUM(m.cache_read_tokens) AS \"cache_read\", SUM(m.input_tokens) AS \"fresh_input\" FROM sessions s JOIN session_models m ON m.session_id=s.session_id WHERE s.complete AND $__timeFilter(s.start_time) GROUP BY 1 ORDER BY 1" } ]
+      "id": 8,
+      "type": "timeseries",
+      "title": "Cache-Read vs Fresh Input Tokens per Day",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('day', s.start_time) AS time, SUM(m.cache_read_tokens) AS \"cache_read\", SUM(m.input_tokens) AS \"fresh_input\" FROM sessions s JOIN session_models m ON m.session_id=s.session_id WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 1"
+        }
+      ]
     }
   ]
 }

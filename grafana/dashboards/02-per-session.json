@@ -1,36 +1,141 @@
 {
   "uid": "copilot-per-session",
-  "title": "Copilot — Per-Session Explorer",
-  "tags": ["copilot", "sessions"],
+  "title": "Copilot \u2014 Per-Session Explorer",
+  "tags": [
+    "copilot",
+    "sessions"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
-  "time": { "from": "now-90d", "to": "now" },
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
   "refresh": "5m",
   "panels": [
     {
-      "id": 1, "type": "table", "title": "Sessions",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "type": "table",
+      "title": "Sessions",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 18,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "fieldConfig": {
         "defaults": {},
         "overrides": [
-          { "matcher": { "id": "byName", "options": "Total Tokens" }, "properties": [ { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "unit", "value": "short" } ] },
-          { "matcher": { "id": "byName", "options": "Complete" }, "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-background" } } ] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Tokens"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Complete"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
         ]
       },
-      "options": { "showHeader": true, "sortBy": [ { "displayName": "Start", "desc": true } ] },
-      "targets": [ { "refId": "A", "format": "table", "rawQuery": true,
-        "rawSql": "SELECT s.start_time AS \"Start\", COALESCE(s.selected_model, (SELECT mm.model FROM session_models mm WHERE mm.session_id=s.session_id ORDER BY (mm.input_tokens+mm.output_tokens+mm.cache_read_tokens+mm.reasoning_tokens) DESC LIMIT 1)) AS \"Model\", st.total_tokens AS \"Total Tokens\", st.input_tokens AS \"Input\", st.output_tokens AS \"Output\", st.cache_read_tokens AS \"Cache Read\", st.reasoning_tokens AS \"Reasoning\", s.premium_requests AS \"Premium Reqs\", round(s.api_duration_ms/1000.0) AS \"API Secs\", s.complete AS \"Complete\", (SELECT string_agg(DISTINCT k.skill, ', ') FROM session_skills k WHERE k.session_id=s.session_id) AS \"Skills\", s.cwd AS \"CWD\", s.session_id AS \"Session\" FROM sessions s JOIN session_totals st ON st.session_id=s.session_id WHERE $__timeFilter(s.start_time) ORDER BY s.start_time DESC" } ]
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Start",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT s.start_time AS \"Start\", s.project AS \"Project\", COALESCE(s.selected_model, (SELECT mm.model FROM session_models mm WHERE mm.session_id=s.session_id ORDER BY (mm.input_tokens+mm.output_tokens+mm.cache_read_tokens+mm.reasoning_tokens) DESC LIMIT 1)) AS \"Model\", st.total_tokens AS \"Total Tokens\", st.input_tokens AS \"Input\", st.output_tokens AS \"Output\", st.cache_read_tokens AS \"Cache Read\", st.reasoning_tokens AS \"Reasoning\", s.premium_requests AS \"Premium Reqs\", round(s.api_duration_ms/1000.0) AS \"API Secs\", s.complete AS \"Complete\", (SELECT string_agg(DISTINCT k.skill, ', ') FROM session_skills k WHERE k.session_id=s.session_id) AS \"Skills\", s.cwd AS \"CWD\", s.session_id AS \"Session\" FROM sessions s JOIN session_totals st ON st.session_id=s.session_id WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) ORDER BY s.start_time DESC"
+        }
+      ]
     },
     {
-      "id": 2, "type": "barchart", "title": "Top 20 Sessions by Total Tokens",
-      "datasource": { "type": "postgres", "uid": "copilot-postgres" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 18 },
-      "fieldConfig": { "defaults": { "unit": "short" } },
-      "options": { "orientation": "horizontal", "xField": "Session" },
-      "targets": [ { "refId": "A", "format": "table", "rawQuery": true,
-        "rawSql": "SELECT to_char(s.start_time,'MM-DD HH24:MI')||' '||COALESCE(s.selected_model,'?') AS \"Session\", st.total_tokens AS \"Total Tokens\" FROM sessions s JOIN session_totals st ON st.session_id=s.session_id WHERE s.complete AND $__timeFilter(s.start_time) ORDER BY st.total_tokens DESC LIMIT 20" } ]
+      "id": 2,
+      "type": "barchart",
+      "title": "Top 20 Sessions by Total Tokens",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Session"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT to_char(s.start_time,'MM-DD HH24:MI')||' '||COALESCE(s.selected_model,'?') AS \"Session\", st.total_tokens AS \"Total Tokens\" FROM sessions s JOIN session_totals st ON st.session_id=s.session_id WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) ORDER BY st.total_tokens DESC LIMIT 20"
+        }
+      ]
     }
-  ]
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "label": "Project",
+        "type": "query",
+        "datasource": {
+          "type": "postgres",
+          "uid": "copilot-postgres"
+        },
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "allValue": null,
+        "current": {},
+        "options": [],
+        "query": "SELECT DISTINCT project FROM sessions WHERE project IS NOT NULL ORDER BY 1",
+        "sort": 1
+      }
+    ]
+  }
 }

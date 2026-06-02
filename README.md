@@ -57,6 +57,44 @@ open http://localhost:3000      # dashboards under the "Copilot Usage" folder
 
 Run `make help` for all targets, `make urls` for service endpoints.
 
+## Attributing usage to a project
+
+Every session is tagged with a **project** so you can filter and group dashboards by it
+(there's a `Project` variable at the top of each dashboard) instead of only by time.
+
+The project name is resolved when you launch `copilot`, in this order:
+
+1. `COPILOT_PROJECT` env var — highest precedence. Prefer the one-shot form so it doesn't
+   stick to unrelated sessions: `COPILOT_PROJECT=my-thing copilot`.
+2. A `.copilot-project` file in the working directory (its first line names the project).
+3. The enclosing git repository's name.
+4. The working directory's name.
+5. `unknown` (for non-project locations like `$HOME` or `/tmp`).
+
+The resolved name is attached to live OTel metrics (as a `project` Prometheus label) and
+recorded to a sidecar (`~/.copilot/session-state/project-tags.jsonl`) that the history parser
+reads, so both pipelines agree. Resolution happens via the `copilot` shell function added by
+`scripts/instrument.sh` — make sure that's sourced (step 3 above).
+
+To tag a project, drop a file once:
+
+```bash
+echo my-project > /path/to/repo/.copilot-project
+```
+
+Existing sessions (run before tagging, or without the wrapper) are auto-attributed from their
+working directory, so dashboards are useful immediately.
+
+### Applying the project columns to an existing database
+
+The `project` columns are created automatically on a fresh Postgres volume. If your database
+predates this feature, apply the migration once:
+
+```bash
+make migrate      # idempotent ALTER TABLE + view refresh
+make backfill     # re-attribute existing sessions
+```
+
 ### Auto-start at login
 
 ```bash
@@ -89,8 +127,9 @@ otelcol/config.yaml           OTel collector (OTLP in → Prometheus + Tempo)
 prometheus/prometheus.yml     scrapes the collector
 tempo/tempo.yaml              trace storage (optional profile)
 postgres/initdb/01-schema.sql per-session schema + session_totals view
+postgres/migrations/          idempotent schema migrations (make migrate)
 backfill/parser.py            events.jsonl → Postgres (idempotent)
-scripts/instrument.sh         shell env to enable CLI OTel export
+scripts/instrument.sh         shell env + `copilot` wrapper (OTel export + project tagging)
 grafana/                      provisioned datasources + dashboards
 launchd/, Makefile            auto-start + operations
 docs/superpowers/specs/       design document

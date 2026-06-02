@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     cwd               TEXT,
     cli_version       TEXT,
     selected_model    TEXT,
+    project           TEXT,
+    project_source    TEXT,  -- env | file | git | cwd | unknown | sidecar
     premium_requests  INTEGER DEFAULT 0,
     premium_cost      DOUBLE PRECISION DEFAULT 0,
     api_duration_ms   BIGINT DEFAULT 0,
@@ -55,6 +57,8 @@ SELECT
     s.cwd,
     s.cli_version,
     s.selected_model,
+    s.project,
+    s.project_source,
     s.premium_requests,
     s.premium_cost,
     s.complete,
@@ -70,5 +74,6 @@ LEFT JOIN session_models m ON m.session_id = s.session_id
 GROUP BY s.session_id;
 
 CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(start_time);
+CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project);
 CREATE INDEX IF NOT EXISTS idx_session_models_model ON session_models(model);
 CREATE INDEX IF NOT EXISTS idx_session_skills_skill ON session_skills(skill);

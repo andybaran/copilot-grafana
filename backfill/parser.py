@@ -13,12 +13,67 @@ Idempotent: re-running re-derives each session and replaces its rows.
 import glob
 import json
 import os
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 
 import psycopg2
 import psycopg2.extras
+
+
+_PROJECT_ALLOWED = re.compile(r"[^A-Za-z0-9._-]")
+_NON_PROJECT_ROOTS = {"", "/", "/tmp", "/private/tmp"}
+
+
+def normalize_project(value):
+    """Match scripts/instrument.sh: first line, trimmed, [A-Za-z0-9._-] only,
+    collapsed dashes, max 80 chars. Returns '' when nothing usable remains."""
+    if not value:
+        return ""
+    first = value.splitlines()[0].strip() if value.splitlines() else ""
+    cleaned = _PROJECT_ALLOWED.sub("-", first)
+    cleaned = re.sub(r"-+", "-", cleaned).strip("-")
+    return cleaned[:80]
+
+
+def derive_project_from_cwd(cwd):
+    """Deterministic fallback for sessions without an explicit tag: the basename
+    of the working directory, with guardrails for non-project roots. No filesystem
+    access (the cwd is an opaque host path inside the backfill container)."""
+    if not cwd:
+        return "unknown", "unknown"
+    path = cwd.rstrip("/")
+    parts = path.split("/")
+    if path in _NON_PROJECT_ROOTS or (len(parts) == 3 and parts[1] in ("Users", "home")):
+        return "unknown", "unknown"
+    name = normalize_project(parts[-1])
+    return (name, "cwd") if name else ("unknown", "unknown")
+
+
+def load_project_tags(path):
+    """Read the launch-time sidecar (one JSON object per line) into
+    {session_id: (project, source)}. Last record for a session wins."""
+    tags = {}
+    if not path or not os.path.exists(path):
+        return tags
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            sid = rec.get("session_id")
+            if not sid:
+                continue
+            name = normalize_project(rec.get("project") or "")
+            if name:
+                tags[sid] = (name, "sidecar")
+    return tags
+
 
 
 def parse_iso(value):
@@ -47,6 +102,8 @@ def parse_session(path, dir_session_id):
         "cwd": None,
         "cli_version": None,
         "selected_model": None,
+        "project": None,
+        "project_source": None,
         "premium_requests": 0,
         "premium_cost": 0.0,
         "api_duration_ms": 0,
@@ -134,10 +191,11 @@ def parse_session(path, dir_session_id):
 
 UPSERT_SESSION = """
 INSERT INTO sessions (session_id, start_time, end_time, cwd, cli_version,
-    selected_model, premium_requests, premium_cost, api_duration_ms,
-    lines_added, lines_removed, complete, source, updated_at)
+    selected_model, project, project_source, premium_requests, premium_cost,
+    api_duration_ms, lines_added, lines_removed, complete, source, updated_at)
 VALUES (%(session_id)s, %(start_time)s, %(end_time)s, %(cwd)s, %(cli_version)s,
-    %(selected_model)s, %(premium_requests)s, %(premium_cost)s, %(api_duration_ms)s,
+    %(selected_model)s, %(project)s, %(project_source)s, %(premium_requests)s,
+    %(premium_cost)s, %(api_duration_ms)s,
     %(lines_added)s, %(lines_removed)s, %(complete)s, 'events_jsonl', now())
 ON CONFLICT (session_id) DO UPDATE SET
     start_time = EXCLUDED.start_time,
@@ -145,6 +203,8 @@ ON CONFLICT (session_id) DO UPDATE SET
     cwd = EXCLUDED.cwd,
     cli_version = EXCLUDED.cli_version,
     selected_model = EXCLUDED.selected_model,
+    project = EXCLUDED.project,
+    project_source = EXCLUDED.project_source,
     premium_requests = EXCLUDED.premium_requests,
     premium_cost = EXCLUDED.premium_cost,
     api_duration_ms = EXCLUDED.api_duration_ms,
@@ -194,6 +254,11 @@ def main():
         print(f"No events.jsonl found under {root}", file=sys.stderr)
         return 1
 
+    tags_path = os.environ.get(
+        "PROJECT_TAGS_FILE", os.path.join(root, "project-tags.jsonl")
+    )
+    project_tags = load_project_tags(tags_path)
+
     conn = psycopg2.connect(
         host=os.environ.get("PGHOST", "postgres"),
         port=os.environ.get("PGPORT", "5432"),
@@ -214,6 +279,11 @@ def main():
                     continue
                 if not s:
                     continue
+                tagged = project_tags.get(s["session_id"])
+                if tagged:
+                    s["project"], s["project_source"] = tagged
+                else:
+                    s["project"], s["project_source"] = derive_project_from_cwd(s["cwd"])
                 write_session(cur, s)
                 conn.commit()
                 processed += 1

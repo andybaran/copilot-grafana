@@ -70,6 +70,7 @@ services:
       PGPASSWORD: copilot
       PGDATABASE: copilot_usage
       SESSION_STATE_DIR: /data/session-state
+      PROJECT_TAGS_FILE: /data/session-state/project-tags.jsonl
     volumes:
       - ${COPILOT_HOME:-${HOME}/.copilot}/session-state:/data/session-state:ro
     depends_on:
