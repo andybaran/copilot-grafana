@@ -1,0 +1,372 @@
+{
+  "uid": "copilot-fleet",
+  "title": "Copilot — Fleet (Subagents)",
+  "tags": [
+    "copilot",
+    "fleet",
+    "subagents"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Subagents Launched",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"Subagents\" FROM session_subagents a JOIN sessions s ON s.session_id = a.session_id WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total Subagent Tokens",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(a.total_tokens), 0) AS \"Tokens\" FROM session_subagents a JOIN sessions s ON s.session_id = a.session_id WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Avg Subagent Duration",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT AVG(a.duration_ms) AS \"Avg Duration\" FROM session_subagents a JOIN sessions s ON s.session_id = a.session_id WHERE a.completed_at IS NOT NULL AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "barchart",
+      "title": "Subagents by Agent Type",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Agent"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT a.agent_name AS \"Agent\", COUNT(*) AS \"Launches\" FROM session_subagents a JOIN sessions s ON s.session_id = a.session_id WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 2 DESC"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "barchart",
+      "title": "Subagent Tokens by Model",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Model"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT a.model AS \"Model\", SUM(a.total_tokens) AS \"Tokens\" FROM session_subagents a JOIN sessions s ON s.session_id = a.session_id WHERE a.completed_at IS NOT NULL AND a.model IS NOT NULL AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 2 DESC"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Subagents Launched per Day",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 70
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('day', s.start_time) AS time, a.agent_name AS metric, COUNT(*) AS value FROM session_subagents a JOIN sessions s ON s.session_id = a.session_id WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1,2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Top Fleet Sessions",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Subagent Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool Calls"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT a.session_id AS \"Session\", s.project AS \"Project\", COUNT(*) AS \"Subagents\", SUM(a.total_tokens) AS \"Subagent Tokens\", SUM(a.total_tool_calls) AS \"Tool Calls\" FROM session_subagents a JOIN sessions s ON s.session_id = a.session_id WHERE $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY a.session_id, s.project ORDER BY \"Subagents\" DESC LIMIT 25"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Subagent Detail",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg Duration ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool Calls"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT a.agent_name AS \"Agent\", a.agent_display_name AS \"Display Name\", a.model AS \"Model\", COUNT(*) AS \"Launches\", SUM(a.total_tokens) AS \"Tokens\", AVG(a.duration_ms) AS \"Avg Duration ms\", SUM(a.total_tool_calls) AS \"Tool Calls\" FROM session_subagents a JOIN sessions s ON s.session_id = a.session_id WHERE a.completed_at IS NOT NULL AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1,2,3 ORDER BY \"Tokens\" DESC"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "label": "Project",
+        "type": "query",
+        "datasource": {
+          "type": "postgres",
+          "uid": "copilot-postgres"
+        },
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "allValue": null,
+        "current": {},
+        "options": [],
+        "query": "SELECT DISTINCT project FROM sessions WHERE project IS NOT NULL ORDER BY 1",
+        "sort": 1
+      }
+    ]
+  }
+}
