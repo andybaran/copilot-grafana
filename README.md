@@ -8,14 +8,20 @@ per session, per model, per skill, and as trends over time. Nothing leaves your 
 Token budgets are loose today but likely to tighten. This stack lets an individual
 contributor see their own usage patterns so they can self-regulate and advise others.
 
+> 📊 **New: Fleet mode (subagent) observability** — see how much of your usage comes from
+> parallel agents (`/fleet`, `Task`, `explore`, `code-review`, …).
+> **[Read the Fleet mode guide →](docs/fleet-mode.md)**
+
 ## What you get
 
 - **Per-session** token usage (input / output / cache / reasoning), models, and skills used.
 - **Trends** across all your sessions over time.
+- **Fleet mode (subagent) attribution** — per-subagent tokens, agent types, models, and
+  durations for parallel agents. See the **[Fleet mode guide](docs/fleet-mode.md)**.
 - **Native OpenTelemetry** ingestion (the CLI emits OTel directly, like VS Code agent
   monitoring) for a real-time operational view.
-- Four Grafana dashboards: Token Trends, Per-Session Explorer, Skills & Models,
-  and Live OTel.
+- Five Grafana dashboards: Token Trends, Per-Session Explorer, Skills & Models,
+  Fleet (Subagents), and Live OTel.
 
 ## How it works
 
@@ -132,6 +138,7 @@ backfill/parser.py            events.jsonl → Postgres (idempotent)
 scripts/instrument.sh         shell env + `copilot` wrapper (OTel export + project tagging)
 grafana/                      provisioned datasources + dashboards
 launchd/, Makefile            auto-start + operations
+docs/fleet-mode.md            fleet/subagent observability guide
 docs/superpowers/specs/       design document
 ```
 

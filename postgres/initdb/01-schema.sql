@@ -48,6 +48,21 @@ CREATE TABLE IF NOT EXISTS session_tools (
     PRIMARY KEY (session_id, tool)
 );
 
+-- Per-subagent (fleet) facts; informational only and not summed into session_totals to avoid double counting.
+CREATE TABLE IF NOT EXISTS session_subagents (
+    session_id         TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+    tool_call_id       TEXT NOT NULL,
+    agent_name         TEXT,
+    agent_display_name TEXT,
+    model              TEXT,
+    total_tokens       BIGINT DEFAULT 0,
+    total_tool_calls   INTEGER DEFAULT 0,
+    duration_ms        BIGINT DEFAULT 0,
+    started_at         TIMESTAMPTZ,
+    completed_at       TIMESTAMPTZ,
+    PRIMARY KEY (session_id, tool_call_id)
+);
+
 -- Convenience view: one row per session with summed token totals.
 CREATE OR REPLACE VIEW session_totals AS
 SELECT
@@ -77,3 +92,5 @@ CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(start_time);
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project);
 CREATE INDEX IF NOT EXISTS idx_session_models_model ON session_models(model);
 CREATE INDEX IF NOT EXISTS idx_session_skills_skill ON session_skills(skill);
+CREATE INDEX IF NOT EXISTS idx_session_subagents_agent ON session_subagents(agent_name);
+CREATE INDEX IF NOT EXISTS idx_session_subagents_model ON session_subagents(model);

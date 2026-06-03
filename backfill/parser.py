@@ -113,9 +113,11 @@ def parse_session(path, dir_session_id):
         "models": {},  # model -> token dict
         "skills": defaultdict(int),
         "tools": defaultdict(int),
+        "subagents": {},  # tool_call_id -> subagent facts
     }
     saw_event = False
     last_ts = None
+    best_shutdown_token_sum = -1
 
     with open(path, "r", encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -153,34 +155,72 @@ def parse_session(path, dir_session_id):
                 if tool:
                     session["tools"][tool] += 1
 
+            elif etype == "subagent.started":
+                tool_call_id = data.get("toolCallId")
+                if tool_call_id:
+                    subagent = session["subagents"].setdefault(tool_call_id, {})
+                    subagent.setdefault("agent_name", data.get("agentName"))
+                    subagent.setdefault("agent_display_name", data.get("agentDisplayName"))
+                    subagent["started_at"] = ts
+
+            elif etype == "subagent.completed":
+                tool_call_id = data.get("toolCallId")
+                if tool_call_id:
+                    subagent = session["subagents"].setdefault(tool_call_id, {})
+                    subagent.update({
+                        "agent_name": data.get("agentName"),
+                        "agent_display_name": data.get("agentDisplayName"),
+                        "model": data.get("model"),
+                        "total_tokens": int(data.get("totalTokens") or 0),
+                        "total_tool_calls": int(data.get("totalToolCalls") or 0),
+                        "duration_ms": int(data.get("durationMs") or 0),
+                        "completed_at": ts,
+                    })
+
             elif etype == "session.shutdown":
                 session["complete"] = True
-                session["premium_requests"] = int(data.get("totalPremiumRequests") or 0)
-                session["api_duration_ms"] = int(data.get("totalApiDurationMs") or 0)
-                changes = data.get("codeChanges") or {}
-                session["lines_added"] = int(changes.get("linesAdded") or 0)
-                session["lines_removed"] = int(changes.get("linesRemoved") or 0)
-                if not session["start_time"]:
-                    session["start_time"] = ms_to_dt(data.get("sessionStartTime"))
-                if ts:
+                if ts and (not session["end_time"] or ts > session["end_time"]):
                     session["end_time"] = ts
+
                 metrics = data.get("modelMetrics") or {}
                 total_cost = 0.0
+                token_sum = 0
+                models = {}
                 for model, mdata in metrics.items():
                     usage = mdata.get("usage") or {}
                     reqs = mdata.get("requests") or {}
+                    input_tokens = int(usage.get("inputTokens") or 0)
+                    output_tokens = int(usage.get("outputTokens") or 0)
+                    cache_read_tokens = int(usage.get("cacheReadTokens") or 0)
+                    cache_write_tokens = int(usage.get("cacheWriteTokens") or 0)
+                    reasoning_tokens = int(usage.get("reasoningTokens") or 0)
                     cost = float(reqs.get("cost") or 0)
+                    token_sum += (
+                        input_tokens + output_tokens + cache_read_tokens
+                        + cache_write_tokens + reasoning_tokens
+                    )
                     total_cost += cost
-                    session["models"][model] = {
-                        "input_tokens": int(usage.get("inputTokens") or 0),
-                        "output_tokens": int(usage.get("outputTokens") or 0),
-                        "cache_read_tokens": int(usage.get("cacheReadTokens") or 0),
-                        "cache_write_tokens": int(usage.get("cacheWriteTokens") or 0),
-                        "reasoning_tokens": int(usage.get("reasoningTokens") or 0),
+                    models[model] = {
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "cache_read_tokens": cache_read_tokens,
+                        "cache_write_tokens": cache_write_tokens,
+                        "reasoning_tokens": reasoning_tokens,
                         "requests": int(reqs.get("count") or 0),
                         "cost": cost,
                     }
-                session["premium_cost"] = total_cost
+
+                if token_sum > best_shutdown_token_sum:
+                    best_shutdown_token_sum = token_sum
+                    session["premium_requests"] = int(data.get("totalPremiumRequests") or 0)
+                    session["api_duration_ms"] = int(data.get("totalApiDurationMs") or 0)
+                    changes = data.get("codeChanges") or {}
+                    session["lines_added"] = int(changes.get("linesAdded") or 0)
+                    session["lines_removed"] = int(changes.get("linesRemoved") or 0)
+                    if not session["start_time"]:
+                        session["start_time"] = ms_to_dt(data.get("sessionStartTime"))
+                    session["models"] = models
+                    session["premium_cost"] = total_cost
 
     if not saw_event:
         return None
@@ -222,6 +262,7 @@ def write_session(cur, s):
     cur.execute("DELETE FROM session_models WHERE session_id = %s", (sid,))
     cur.execute("DELETE FROM session_skills WHERE session_id = %s", (sid,))
     cur.execute("DELETE FROM session_tools WHERE session_id = %s", (sid,))
+    cur.execute("DELETE FROM session_subagents WHERE session_id = %s", (sid,))
 
     if s["models"]:
         psycopg2.extras.execute_values(
@@ -244,6 +285,18 @@ def write_session(cur, s):
             cur,
             "INSERT INTO session_tools (session_id, tool, invocations) VALUES %s",
             [(sid, k, v) for k, v in s["tools"].items()],
+        )
+    if s["subagents"]:
+        psycopg2.extras.execute_values(
+            cur,
+            """INSERT INTO session_subagents (session_id, tool_call_id,
+               agent_name, agent_display_name, model, total_tokens,
+               total_tool_calls, duration_ms, started_at, completed_at) VALUES %s""",
+            [(sid, tool_call_id, d.get("agent_name"), d.get("agent_display_name"),
+              d.get("model"), d.get("total_tokens", 0),
+              d.get("total_tool_calls", 0), d.get("duration_ms", 0),
+              d.get("started_at"), d.get("completed_at"))
+             for tool_call_id, d in s["subagents"].items()],
         )
 
 
