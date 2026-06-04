@@ -46,6 +46,9 @@ events.jsonl ──▶ parser.py ──▶ Postgres ─────────�
 
 Requires podman (or Docker) with compose.
 
+> 🪟 **On Windows 11?** Use the PowerShell port — `make.ps1` and `scripts/instrument.ps1` —
+> documented in the **[Windows guide →](docs/windows.md)**. The commands below are macOS/Linux.
+
 ```bash
 # 1. Start the stack
 make up
@@ -136,14 +139,18 @@ postgres/initdb/01-schema.sql per-session schema + session_totals view
 postgres/migrations/          idempotent schema migrations (make migrate)
 backfill/parser.py            events.jsonl → Postgres (idempotent)
 scripts/instrument.sh         shell env + `copilot` wrapper (OTel export + project tagging)
+scripts/instrument.ps1        Windows/PowerShell port of the above
+make.ps1                      Windows/PowerShell port of the Makefile targets
 grafana/                      provisioned datasources + dashboards
-launchd/, Makefile            auto-start + operations
+launchd/, Makefile            auto-start + operations (macOS/Linux)
+docs/windows.md               Windows 11 setup guide (PowerShell + podman)
 docs/fleet-mode.md            fleet/subagent observability guide
 docs/superpowers/specs/       design document
 ```
 
 ## Notes
 
-- Tested with Copilot CLI 1.0.57 and podman 5.7.1 on macOS (Apple Silicon).
+- Tested with Copilot CLI 1.0.57 and podman 5.7.1 on macOS (Apple Silicon), and Copilot CLI
+  1.0.59 with podman 5.8 on Windows 11 (see [docs/windows.md](docs/windows.md)).
 - Default Grafana login is anonymous-admin for local convenience.
 - `gen_ai.*` metric/attribute names follow the OTel GenAI semantic conventions.

@@ -18,12 +18,19 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 
-import psycopg2
-import psycopg2.extras
+try:
+    import psycopg2
+    import psycopg2.extras
+except ImportError:  # allow importing the pure helpers (e.g. tests) without the driver
+    psycopg2 = None
 
 
 _PROJECT_ALLOWED = re.compile(r"[^A-Za-z0-9._-]")
+# Non-project roots, expressed with forward slashes (cwds are normalized before the
+# comparison). Covers POSIX temp/home-ish roots; Windows drive and UNC roots are handled
+# structurally in derive_project_from_cwd.
 _NON_PROJECT_ROOTS = {"", "/", "/tmp", "/private/tmp"}
+_DRIVE_ROOT = re.compile(r"^[A-Za-z]:$")
 
 
 def normalize_project(value):
@@ -40,13 +47,29 @@ def normalize_project(value):
 def derive_project_from_cwd(cwd):
     """Deterministic fallback for sessions without an explicit tag: the basename
     of the working directory, with guardrails for non-project roots. No filesystem
-    access (the cwd is an opaque host path inside the backfill container)."""
+    access (the cwd is an opaque host path inside the backfill container).
+
+    Cross-platform: handles both POSIX (``/home/me/repo``) and Windows/UNC paths
+    (``C:\\Users\\me\\repo``, ``\\\\server\\share\\repo``). Backslashes are folded to
+    forward slashes so a Windows cwd yields its basename rather than one mangled token.
+    """
     if not cwd:
         return "unknown", "unknown"
-    path = cwd.rstrip("/")
-    parts = path.split("/")
-    if path in _NON_PROJECT_ROOTS or (len(parts) == 3 and parts[1] in ("Users", "home")):
+    # Fold Windows separators so the basename logic works regardless of host OS.
+    norm = cwd.replace("\\", "/").rstrip("/")
+    if norm in _NON_PROJECT_ROOTS or _DRIVE_ROOT.match(norm):
         return "unknown", "unknown"
+    parts = norm.split("/")
+    # POSIX user roots: /Users/<name>, /home/<name>; and the Windows equivalent
+    # C:/Users/<name> (after folding) -> ["C:", "Users", "<name>"].
+    if len(parts) == 3 and parts[1] in ("Users", "home"):
+        return "unknown", "unknown"
+    # UNC roots: //server or //server/share are not project directories, but a
+    # deeper path (//server/share/repo) is.
+    if norm.startswith("//"):
+        unc = [p for p in parts if p]
+        if len(unc) <= 2:
+            return "unknown", "unknown"
     name = normalize_project(parts[-1])
     return (name, "cwd") if name else ("unknown", "unknown")
 
@@ -301,6 +324,10 @@ def write_session(cur, s):
 
 
 def main():
+    if psycopg2 is None:
+        print("psycopg2 is required to run the parser (pip install psycopg2-binary).",
+              file=sys.stderr)
+        return 2
     root = os.environ.get("SESSION_STATE_DIR", "/data/session-state")
     paths = sorted(glob.glob(os.path.join(root, "*", "events.jsonl")))
     if not paths:
