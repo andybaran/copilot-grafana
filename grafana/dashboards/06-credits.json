@@ -146,14 +146,14 @@
       "type": "text",
       "title": "Why the estimate looks low: prompt caching",
       "gridPos": {
-        "h": 6,
-        "w": 12,
+        "h": 14,
+        "w": 24,
         "x": 0,
-        "y": 9
+        "y": 14
       },
       "options": {
         "mode": "markdown",
-        "content": "Most input tokens here are **prompt-cache reads**, billed at roughly **10% of the base input price**, which is why the estimate is far below the no-caching figures on the right.\n\nWhen the CLI re-sends the growing conversation (system prompt, tool definitions, prior turns) on every step, the model providers serve that repeated prefix from cache instead of reprocessing it. The CLI's `inputTokens` is the **total** prompt; `cacheReadTokens`/`cacheWriteTokens` are the cached subset of it.\n\n- **Cache reads** ≈ 0.1× base input price\n- **Cache writes** ≈ 1.25× base input price (first time a prefix is cached)\n- Fresh (uncached) input is billed at the full base rate\n\nRefs: [OpenAI prompt caching](https://platform.openai.com/docs/guides/prompt-caching) · [Anthropic prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) · [details](https://github.com/andybaran/copilot-grafana/blob/main/docs/ai-credits.md#how-prompt-caching-affects-the-estimate)"
+        "content": "## Why the estimate looks low: prompt caching\n\nMost input tokens here are **prompt-cache reads**, billed at roughly **10% of the base input price** — which is why the estimate sits far below the *Est. Cost Without Caching* figure above.\n\nOn **every step** of an agentic session the CLI re-sends the same large prefix, and the model provider serves it from cache instead of reprocessing it. That prefix has three parts:\n\n1. **System prompt** — the CLI's instructions plus your custom `AGENTS.md` / repo guidance.\n2. **Tool definitions** — the JSON schema for every available tool (large).\n3. **Conversation history** — all prior messages and tool results so far.\n\n`inputTokens` counts the **whole** prefix every turn; `cacheReadTokens` / `cacheWriteTokens` are the cached subset of it.\n\n### Worked example — a large Terraform + AWS repo\n\nYou're working in a big Terraform codebase that manages AWS infrastructure, with the **Terraform MCP server** (registry / module / provider tools), the **AWS MCP server** (dozens of AWS API tools), and local **`gh`** calls through the built-in bash tool. Those two MCP servers alone register **dozens of tool definitions** — easily tens of thousands of tokens of JSON schema — and that block is byte-for-byte identical on every request. Together with the system prompt it forms one big **static prefix**.\n\nNow you ask: *\"add a VPC module and open a PR.\"* Copilot runs a loop:\n\n- **Turn 1** — reads `main.tf` and calls a Terraform MCP tool to check the registry. The static prefix (system + all tool defs) is new, so it is **written to cache** once (~1.25× base). The model's reply and the file contents are appended to history.\n- **Turn 2** — calls an AWS MCP tool to inspect existing subnets. The *entire* prefix from Turn 1 is unchanged, so it is a **cache read** (~0.1× base); only the new tool result is fresh, full-price input.\n- **Turn 3+** — runs `gh pr create`, edits files, re-plans. Each step **re-reads an ever-larger cached prefix** and adds only a little fresh input.\n\nAfter ~50 turns the model has *read* that growing prefix 50 times but *processed* it fresh only once. `input_tokens` looks huge, yet 90%+ of it is `cache_read_tokens` at a tenth of the price — so the real cost is a fraction of the list-price-without-caching number. The static, identical tool definitions from the Terraform and AWS MCP servers are exactly the kind of large repeated prefix caching is designed to make cheap.\n\n**Rates:** cache reads ≈ 0.1× base input · cache writes ≈ 1.25× base input · fresh input at full rate.\n\nRefs: [OpenAI prompt caching](https://platform.openai.com/docs/guides/prompt-caching) · [Anthropic prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) · [details](https://github.com/andybaran/copilot-grafana/blob/main/docs/ai-credits.md#how-prompt-caching-affects-the-estimate)"
       }
     },
     {
@@ -166,9 +166,9 @@
         "uid": "copilot-postgres"
       },
       "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 12,
+        "h": 5,
+        "w": 12,
+        "x": 0,
         "y": 9
       },
       "fieldConfig": {
@@ -210,9 +210,9 @@
         "uid": "copilot-postgres"
       },
       "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 18,
+        "h": 5,
+        "w": 12,
+        "x": 12,
         "y": 9
       },
       "fieldConfig": {
@@ -258,7 +258,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 15
+        "y": 28
       },
       "fieldConfig": {
         "defaults": {
@@ -290,7 +290,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 15
+        "y": 28
       },
       "fieldConfig": {
         "defaults": {
@@ -322,7 +322,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 38
       },
       "fieldConfig": {
         "defaults": {
@@ -357,7 +357,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 34
+        "y": 47
       },
       "fieldConfig": {
         "defaults": {},
@@ -412,7 +412,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 34
+        "y": 47
       },
       "fieldConfig": {
         "defaults": {},
@@ -491,7 +491,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 56
       },
       "fieldConfig": {
         "defaults": {},
