@@ -1,0 +1,442 @@
+{
+  "uid": "copilot-credits",
+  "title": "Copilot — AI Credits (estimated)",
+  "tags": [
+    "copilot",
+    "credits",
+    "cost"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Cost estimate disclaimer",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Estimated GROSS cost at published list prices (1 AI credit = $0.01). Ignores the 10% auto-model discount, included monthly allowances, and long-context tier surcharges. Derived from per-model token counts × list price; not your actual bill."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Estimated AI Credits",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(sc.est_credits),0) AS \"Credits\" FROM session_credits sc JOIN sessions s USING(session_id) WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Estimated Cost (USD)",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(sc.est_usd),0) AS \"USD\" FROM session_credits sc JOIN sessions s USING(session_id) WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Sessions with incomplete pricing",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"Sessions\" FROM session_credits sc JOIN sessions s USING(session_id) WHERE s.complete AND NOT sc.complete_pricing AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "barchart",
+      "title": "Credits by Model",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Model"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT mc.model AS \"Model\", SUM(mc.credits) AS \"Credits\" FROM session_model_credits mc JOIN sessions s USING(session_id) WHERE s.complete AND mc.priced AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 2 DESC"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "barchart",
+      "title": "Credits by Project",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Project"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT s.project AS \"Project\", SUM(sc.est_credits) AS \"Credits\" FROM session_credits sc JOIN sessions s USING(session_id) WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY 2 DESC"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Estimated Credits per Day",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 70
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('day', s.start_time) AS time, s.project AS metric, SUM(sc.est_credits) AS value FROM session_credits sc JOIN sessions s USING(session_id) WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1,2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Top Sessions by Credits",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Credits"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "USD"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT sc.session_id AS \"Session\", s.project AS \"Project\", round(sc.est_credits::numeric) AS \"Credits\", round(sc.est_usd::numeric,2) AS \"USD\", sc.complete_pricing AS \"Complete Pricing\" FROM session_credits sc JOIN sessions s USING(session_id) WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) ORDER BY sc.est_credits DESC NULLS LAST LIMIT 25"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Model Cost Detail",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Input Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Output Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Credits"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "USD"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT mc.model AS \"Model\", COUNT(DISTINCT mc.session_id) AS \"Sessions\", SUM(mc.input_tokens) AS \"Input Tokens\", SUM(mc.output_tokens) AS \"Output Tokens\", round(SUM(mc.credits)::numeric,1) AS \"Credits\", round(SUM(mc.usd)::numeric,2) AS \"USD\" FROM session_model_credits mc JOIN sessions s USING(session_id) WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring}) GROUP BY 1 ORDER BY \"Credits\" DESC NULLS LAST"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Pricing Reference",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*\\$\\/M$/"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT display_name AS \"Model\", vendor AS \"Vendor\", input_per_mtok AS \"Input $/M\", cached_input_per_mtok AS \"Cached $/M\", cache_write_per_mtok AS \"Cache-write $/M\", output_per_mtok AS \"Output $/M\", pricing_confidence AS \"Confidence\" FROM model_pricing ORDER BY vendor, display_name"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "label": "Project",
+        "type": "query",
+        "datasource": {
+          "type": "postgres",
+          "uid": "copilot-postgres"
+        },
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "allValue": null,
+        "current": {},
+        "options": [],
+        "query": "SELECT DISTINCT project FROM sessions WHERE project IS NOT NULL ORDER BY 1",
+        "sort": 1
+      }
+    ]
+  }
+}

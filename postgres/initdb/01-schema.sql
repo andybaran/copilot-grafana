@@ -63,6 +63,68 @@ CREATE TABLE IF NOT EXISTS session_subagents (
     PRIMARY KEY (session_id, tool_call_id)
 );
 
+-- Per-model AI Credit pricing (published GitHub Copilot list prices, per 1M tokens).
+-- Keyed by the CLI model string exactly as it appears in session_models.model.
+-- Seed data lives in 02-seed-pricing.sql (initdb) and migrations/003-ai-credits.sql.
+-- Estimates are GROSS list-price only: they ignore the 10% auto-model discount,
+-- included monthly allowances, and long-context tier surcharges (see docs/ai-credits.md).
+CREATE TABLE IF NOT EXISTS model_pricing (
+    model                 TEXT PRIMARY KEY,  -- matches session_models.model
+    display_name          TEXT,
+    vendor                TEXT,
+    input_per_mtok        DOUBLE PRECISION NOT NULL DEFAULT 0,
+    cached_input_per_mtok DOUBLE PRECISION NOT NULL DEFAULT 0,
+    cache_write_per_mtok  DOUBLE PRECISION NOT NULL DEFAULT 0,  -- Anthropic only; 0 elsewhere
+    output_per_mtok       DOUBLE PRECISION NOT NULL DEFAULT 0,
+    pricing_confidence    TEXT NOT NULL DEFAULT 'exact',          -- exact | approximate
+    source                TEXT NOT NULL DEFAULT 'official_seed',  -- official_seed | local_override
+    note                  TEXT
+);
+
+-- Per session+model estimated cost. The CLI normalizes token metrics so that
+-- input_tokens is the TOTAL prompt (cache_read + cache_write are subsets) and
+-- output_tokens already INCLUDES reasoning_tokens (verified against the data).
+-- We therefore bill non-cached input + cached read + cache write + total output,
+-- and never re-add reasoning_tokens, to avoid double counting. usd is NULL for
+-- models with no pricing row so unpriced usage is never silently counted as $0.
+CREATE OR REPLACE VIEW session_model_credits AS
+SELECT
+    q.session_id,
+    q.model,
+    q.priced,
+    q.input_tokens,
+    q.output_tokens,
+    q.usd,
+    (q.usd * 100.0) AS credits
+FROM (
+    SELECT
+        sm.session_id,
+        sm.model,
+        (p.model IS NOT NULL) AS priced,
+        sm.input_tokens,
+        sm.output_tokens,
+        CASE WHEN p.model IS NULL THEN NULL ELSE (
+            GREATEST(sm.input_tokens - sm.cache_read_tokens - sm.cache_write_tokens, 0) * p.input_per_mtok
+            + sm.cache_read_tokens  * p.cached_input_per_mtok
+            + sm.cache_write_tokens * p.cache_write_per_mtok
+            + sm.output_tokens      * p.output_per_mtok
+        ) / 1000000.0 END AS usd
+    FROM session_models sm
+    LEFT JOIN model_pricing p ON p.model = sm.model
+) q;
+
+-- One row per session: estimated gross cost plus transparency on unpriced usage.
+CREATE OR REPLACE VIEW session_credits AS
+SELECT
+    c.session_id,
+    SUM(c.usd)     AS est_usd,      -- NULL contributions (unpriced) are ignored by SUM
+    SUM(c.credits) AS est_credits,
+    bool_and(c.priced) AS complete_pricing,
+    COALESCE(string_agg(DISTINCT CASE WHEN NOT c.priced THEN c.model END, ', '), '') AS unpriced_models,
+    COALESCE(SUM(CASE WHEN NOT c.priced THEN c.input_tokens + c.output_tokens ELSE 0 END), 0) AS unpriced_tokens
+FROM session_model_credits c
+GROUP BY c.session_id;
+
 -- Convenience view: one row per session with summed token totals.
 CREATE OR REPLACE VIEW session_totals AS
 SELECT
