@@ -1,0 +1,35 @@
+# Start the Copilot observability stack (Windows). Ensures the podman machine is
+# running first. Invoked by the Scheduled Task at logon, and usable manually.
+# Rendered from startup.ps1.template by `make.ps1 install` (placeholders substituted).
+#
+# NOTE: ErrorActionPreference stays at "Continue" on purpose. `podman compose` writes
+# an informational "external compose provider" banner to stderr; under "Stop" that
+# benign stderr would be promoted to a terminating error and abort startup. Success is
+# determined from $LASTEXITCODE instead.
+$ErrorActionPreference = "Continue"
+
+$RepoDir     = "__REPO_DIR__"
+$ComposeExe  = "__COMPOSE_EXE__"
+$ComposeArgs = @(__COMPOSE_ARGS__)
+
+Set-Location -LiteralPath $RepoDir
+
+# Ensure the podman VM is up (no-op on Docker Desktop setups).
+$podman = Get-Command podman -ErrorAction SilentlyContinue
+if ($podman) {
+    $state = (& $podman.Source machine inspect --format '{{.State}}' 2>$null)
+    if ($state -notmatch 'running') {
+        & $podman.Source machine start 2>$null | Out-Null
+    }
+}
+
+# Wait for the container engine to be ready (ignore the provider banner on stderr;
+# trust the exit code).
+for ($i = 0; $i -lt 30; $i++) {
+    & $ComposeExe @ComposeArgs ps 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { break }
+    Start-Sleep -Seconds 2
+}
+
+& $ComposeExe @ComposeArgs up -d 2>&1 | Out-Host
+exit $LASTEXITCODE

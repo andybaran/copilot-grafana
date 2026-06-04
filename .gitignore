@@ -1,5 +1,7 @@
-# Rendered from templates by `make install`
+# Rendered from templates by `make install` / `make.ps1 install`
 scripts/startup.sh
+scripts/startup.ps1
 launchd.out.log
 launchd.err.log
 *.log
+__pycache__/
