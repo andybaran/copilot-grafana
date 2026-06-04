@@ -95,7 +95,11 @@ SELECT
     q.input_tokens,
     q.output_tokens,
     q.usd,
-    (q.usd * 100.0) AS credits
+    (q.usd * 100.0) AS credits,
+    -- Counterfactual: cost if prompt caching did NOT exist, i.e. every prompt
+    -- token billed at the full base input rate (cache reads/writes are subsets
+    -- of input_tokens, so pricing all of input_tokens at base covers them).
+    q.usd_uncached
 FROM (
     SELECT
         sm.session_id,
@@ -108,7 +112,11 @@ FROM (
             + sm.cache_read_tokens  * p.cached_input_per_mtok
             + sm.cache_write_tokens * p.cache_write_per_mtok
             + sm.output_tokens      * p.output_per_mtok
-        ) / 1000000.0 END AS usd
+        ) / 1000000.0 END AS usd,
+        CASE WHEN p.model IS NULL THEN NULL ELSE (
+            sm.input_tokens  * p.input_per_mtok
+            + sm.output_tokens * p.output_per_mtok
+        ) / 1000000.0 END AS usd_uncached
     FROM session_models sm
     LEFT JOIN model_pricing p ON p.model = sm.model
 ) q;
@@ -121,7 +129,8 @@ SELECT
     SUM(c.credits) AS est_credits,
     bool_and(c.priced) AS complete_pricing,
     COALESCE(string_agg(DISTINCT CASE WHEN NOT c.priced THEN c.model END, ', '), '') AS unpriced_models,
-    COALESCE(SUM(CASE WHEN NOT c.priced THEN c.input_tokens + c.output_tokens ELSE 0 END), 0) AS unpriced_tokens
+    COALESCE(SUM(CASE WHEN NOT c.priced THEN c.input_tokens + c.output_tokens ELSE 0 END), 0) AS unpriced_tokens,
+    SUM(c.usd_uncached) AS est_usd_uncached   -- gross cost with NO prompt caching (counterfactual)
 FROM session_model_credits c
 GROUP BY c.session_id;
 

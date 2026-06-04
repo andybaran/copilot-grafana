@@ -47,6 +47,42 @@ So the estimate bills non-cached input, cached reads, cache writes, and total ou
 Reasoning tokens are **not** added separately because they are already in output. The
 cache-write rate is Anthropic-only; it is `0` for OpenAI and Google models.
 
+## How prompt caching affects the estimate
+
+The headline number usually looks **surprisingly low**. That is real, and it is caused by
+**prompt caching**, not by an error in the math.
+
+In an agentic CLI session the same prefix — system prompt, tool definitions, and the prior
+conversation — is re-sent on every step. Both OpenAI and Anthropic automatically serve that
+repeated prefix from a cache instead of reprocessing it, and bill the cached portion at a
+steep discount:
+
+- **Cache reads** are billed at **~0.1× the base input rate** (≈90% off).
+- **Cache writes** (the first time a prefix is cached) are billed at **~1.25× the base input
+  rate** for Anthropic's 5-minute cache; OpenAI has no separate cache-write charge.
+- **Fresh, uncached input** is billed at the full base rate.
+
+Because `input_tokens` is the *total* prompt and `cache_read_tokens` / `cache_write_tokens`
+are subsets of it, the estimate already prices each token at the correct (mostly cached) rate.
+In practice the large majority of input tokens are cache reads, so the cost is far below what
+you would pay without caching.
+
+To make this visible, the views also expose a **no-caching counterfactual**:
+
+- `session_model_credits.usd_uncached` and `session_credits.est_usd_uncached` price **every**
+  prompt token at the full base input rate (plus output).
+- `est_usd_uncached − est_usd` is therefore the dollar value of the caching discount, and the
+  dashboard surfaces it as **Est. Cost Without Caching** and **Cache Savings %**.
+
+**Vendor references:**
+
+- OpenAI — [Prompt Caching](https://platform.openai.com/docs/guides/prompt-caching): caches
+  repeated prefixes automatically, reduces input token cost by up to ~90%, and reports the
+  cached portion as `usage.prompt_tokens_details.cached_tokens` (a subset of `prompt_tokens`).
+- Anthropic — [Prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching):
+  cache **reads = 0.1×** base input, **5-minute cache writes = 1.25×**, **1-hour cache writes
+  = 2×** base input.
+
 ## Data model
 
 ### `model_pricing`
@@ -63,18 +99,21 @@ cache_write_per_mtok, output_per_mtok, pricing_confidence, source, note)`
 
 ### `session_model_credits`
 
-`session_model_credits(session_id, model, priced, input_tokens, output_tokens, usd, credits)`
+`session_model_credits(session_id, model, priced, input_tokens, output_tokens, usd, credits,
+usd_uncached)`
 
 One row per session + model. `usd` and `credits` are `NULL` for any model with no pricing
-row, so unpriced usage is never silently counted as `$0`.
+row, so unpriced usage is never silently counted as `$0`. `usd_uncached` prices all input at
+the full base rate (the no-caching counterfactual).
 
 ### `session_credits`
 
 `session_credits(session_id, est_usd, est_credits, complete_pricing, unpriced_models,
-unpriced_tokens)`
+unpriced_tokens, est_usd_uncached)`
 
 One row per session. `complete_pricing = false` and `unpriced_models` flag sessions that used
-a model not present in `model_pricing`.
+a model not present in `model_pricing`. `est_usd_uncached` is the gross cost the session would
+have incurred with no prompt caching.
 
 ## Important caveats
 
@@ -106,6 +145,8 @@ as the other dashboards and includes:
 
 - **Stats** — total estimated credits, total estimated USD, and sessions with incomplete
   pricing.
+- **Prompt-caching panels** — a short explainer, **Est. Cost Without Caching** (the no-caching
+  counterfactual), and **Cache Savings %** (how much prompt caching is saving you).
 - **Credits by Model** — estimated credits grouped by model.
 - **Credits by Project** — estimated credits grouped by project.
 - **Credits per Day** — daily trend over the selected time range.
@@ -121,8 +162,9 @@ make backfill    # only needed to (re)load token data; credits are computed live
 ```
 
 Prices are seeded by `postgres/migrations/003-ai-credits.sql` and, on a fresh volume,
-`postgres/initdb/02-seed-pricing.sql`. To update a rate when GitHub changes pricing, edit
-those files and re-run `make migrate`.
+`postgres/initdb/02-seed-pricing.sql`. The no-caching counterfactual columns are added by
+`postgres/migrations/004-cache-savings.sql`. To update a rate when GitHub changes pricing,
+edit those files and re-run `make migrate`.
 
 To override a single rate locally without it being re-seeded, update that row and mark it as
 a local override:

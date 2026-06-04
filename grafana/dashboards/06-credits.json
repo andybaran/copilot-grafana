@@ -142,6 +142,111 @@
       ]
     },
     {
+      "id": 11,
+      "type": "text",
+      "title": "Why the estimate looks low: prompt caching",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Most input tokens here are **prompt-cache reads**, billed at roughly **10% of the base input price**, which is why the estimate is far below the no-caching figures on the right.\n\nWhen the CLI re-sends the growing conversation (system prompt, tool definitions, prior turns) on every step, the model providers serve that repeated prefix from cache instead of reprocessing it. The CLI's `inputTokens` is the **total** prompt; `cacheReadTokens`/`cacheWriteTokens` are the cached subset of it.\n\n- **Cache reads** ≈ 0.1× base input price\n- **Cache writes** ≈ 1.25× base input price (first time a prefix is cached)\n- Fresh (uncached) input is billed at the full base rate\n\nRefs: [OpenAI prompt caching](https://platform.openai.com/docs/guides/prompt-caching) · [Anthropic prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) · [details](https://github.com/andybaran/copilot-grafana/blob/main/docs/ai-credits.md#how-prompt-caching-affects-the-estimate)"
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Est. Cost Without Caching (USD)",
+      "description": "Counterfactual: every prompt token billed at the full base input rate (no cache discount). The gap vs. Estimated Cost is what prompt caching saves.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(sc.est_usd_uncached),0) AS \"USD\" FROM session_credits sc JOIN sessions s USING(session_id) WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Cache Savings",
+      "description": "Percent of gross list-price cost avoided by prompt caching = (cost without caching − estimated cost) / cost without caching.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "copilot-postgres"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT round((100.0*(SUM(sc.est_usd_uncached)-SUM(sc.est_usd))/NULLIF(SUM(sc.est_usd_uncached),0))::numeric,1) AS \"Saved %\" FROM session_credits sc JOIN sessions s USING(session_id) WHERE s.complete AND $__timeFilter(s.start_time) AND s.project IN (${project:sqlstring})"
+        }
+      ]
+    },
+    {
       "id": 5,
       "type": "barchart",
       "title": "Credits by Model",
@@ -153,7 +258,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 9
+        "y": 15
       },
       "fieldConfig": {
         "defaults": {
@@ -185,7 +290,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 9
+        "y": 15
       },
       "fieldConfig": {
         "defaults": {
@@ -217,7 +322,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 25
       },
       "fieldConfig": {
         "defaults": {
@@ -252,7 +357,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 28
+        "y": 34
       },
       "fieldConfig": {
         "defaults": {},
@@ -307,7 +412,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 28
+        "y": 34
       },
       "fieldConfig": {
         "defaults": {},
@@ -386,7 +491,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 43
       },
       "fieldConfig": {
         "defaults": {},
