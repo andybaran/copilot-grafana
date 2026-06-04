@@ -12,16 +12,22 @@ contributor see their own usage patterns so they can self-regulate and advise ot
 > parallel agents (`/fleet`, `Task`, `explore`, `code-review`, …).
 > **[Read the Fleet mode guide →](docs/fleet-mode.md)**
 
+> 💳 **AI Credits cost estimates** — GitHub now bills Copilot in AI Credits; this
+> stack estimates per-session/per-model credit cost from your token usage.
+> **[Read the AI Credits guide →](docs/ai-credits.md)**
+
 ## What you get
 
 - **Per-session** token usage (input / output / cache / reasoning), models, and skills used.
+- **Estimated AI Credit cost** by session, model, and project. See the
+  **[AI Credits guide](docs/ai-credits.md)**.
 - **Trends** across all your sessions over time.
 - **Fleet mode (subagent) attribution** — per-subagent tokens, agent types, models, and
   durations for parallel agents. See the **[Fleet mode guide](docs/fleet-mode.md)**.
 - **Native OpenTelemetry** ingestion (the CLI emits OTel directly, like VS Code agent
   monitoring) for a real-time operational view.
-- Five Grafana dashboards: Token Trends, Per-Session Explorer, Skills & Models,
-  Fleet (Subagents), and Live OTel.
+- Six Grafana dashboards: Token Trends, Per-Session Explorer, Skills & Models,
+  Fleet (Subagents), AI Credits (estimated), and Live OTel.
 
 ## How it works
 
@@ -145,6 +151,7 @@ grafana/                      provisioned datasources + dashboards
 launchd/, Makefile            auto-start + operations (macOS/Linux)
 docs/windows.md               Windows 11 setup guide (PowerShell + podman)
 docs/fleet-mode.md            fleet/subagent observability guide
+docs/ai-credits.md            AI Credit cost-estimation guide
 docs/superpowers/specs/       design document
 ```
 
